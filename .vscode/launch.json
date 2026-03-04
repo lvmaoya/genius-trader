@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:genius-trader}",
+            "name": "Debug GeniusTraderApp",
+            "program": "${workspaceFolder:genius-trader}/.build/debug/GeniusTraderApp",
+            "preLaunchTask": "swift: Build Debug GeniusTraderApp"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:genius-trader}",
+            "name": "Release GeniusTraderApp",
+            "program": "${workspaceFolder:genius-trader}/.build/release/GeniusTraderApp",
+            "preLaunchTask": "swift: Build Release GeniusTraderApp"
+        }
+    ]
+}

@@ -1,252 +1,380 @@
-import AppKit
 import SwiftUI
-
-func resourceImage(named: String) -> Image? {
-    for ext in ["pdf", "png", "jpg", "jpeg"] {
-        if let url = Bundle.module.url(forResource: named, withExtension: ext),
-           let img = NSImage(contentsOf: url) {
-            return Image(nsImage: img)
-        }
-    }
-    return nil
-}
 
 @main
 struct GeniusTraderApp: App {
     var body: some Scene {
-        MenuBarExtra(
-            "盯币",
-            image: (resourceImage(named: "MenuBarIcon")?.renderingMode(.template)) ?? Image(systemName: "bitcoinsign.circle")
-        ) {
-            MenuContentView()
-                .frame(width: 300)
-        }
-        Settings {
-            PreferencesView()
+        WindowGroup {
+            CryptoDashboardView()
+                .frame(minWidth: 980, minHeight: 680)
         }
     }
 }
 
-struct MenuContentView: View {
-    @AppStorage("coinSymbols") private var coinSymbols: String = "BTC,ETH"
-    @State private var newSymbol: String = ""
-    @State private var prices: [String: CoinPrice] = [:]
-    @State private var isLoading: Bool = false
-    @State private var lastUpdated: Date?
-    @State private var isAdding: Bool = false
-    @State private var hoveredSymbol: String?
+struct CryptoAsset: Identifiable, Hashable {
+    let id: String
+    let symbol: String
+    let name: String
+}
 
-    private var coins: [String] {
-        coinSymbols
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() }
-            .filter { !$0.isEmpty }
+struct CryptoQuote: Hashable {
+    let price: Double
+    let change24h: Double?
+    let high24h: Double?
+    let low24h: Double?
+    let marketCap: Double?
+    let volume24h: Double?
+    let updatedAt: Date
+}
+
+actor CryptoAPIClient {
+    private struct SearchResponse: Decodable {
+        let coins: [Coin]
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                if let logo = resourceImage(named: "AppLogo") {
-                    logo
-                        .resizable()
-                        .renderingMode(.original)
-                        .frame(width: 16, height: 16)
-                }
-                Text("Genius Trader")
-                    .font(.headline)
-                Spacer()
-                Button {
-                    isAdding.toggle()
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .buttonStyle(.borderless)
-            }
+    private struct Coin: Decodable {
+        let id: String
+        let symbol: String
+        let name: String
+    }
 
-            if isAdding {
-                HStack {
-                    TextField("添加币种，如 BTC", text: $newSymbol)
-                    Button("添加") {
-                        addSymbol()
-                    }
-                    .disabled(newSymbol.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
+    private struct QuotePayload: Decodable {
+        let usd: Double?
+        let usd24hChange: Double?
+        let usd24hVol: Double?
+        let usdMarketCap: Double?
+        let usd24hHigh: Double?
+        let usd24hLow: Double?
+        let lastUpdatedAt: Int?
 
-            if !coins.isEmpty {
-                ForEach(coins, id: \.self) { symbol in
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(symbol)
-                                    .font(.body)
-                                if let price = prices[symbol]?.usd {
-                                    Text(formatPrice(price))
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                } else {
-                                    Text(isLoading ? "加载中" : "暂无价格")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            Spacer()
-                            if let change = prices[symbol]?.usd24hChange {
-                                Text(formatChange(change))
-                                    .font(.caption)
-                                    .foregroundColor(change >= 0 ? .green : .red)
-                            }
-                            Spacer()
-                            Button("移除") {
-                                remove(symbol: symbol)
-                            }
-                            .buttonStyle(.borderless)
-                        }
-                        if hoveredSymbol == symbol {
-                            HStack {
-                                if let change = prices[symbol]?.usd24hChange {
-                                    Text("24h \(formatChange(change))")
-                                } else {
-                                    Text("24h 暂无数据")
-                                }
-                                Spacer()
-                                if let lastUpdated {
-                                    Text("更新 \(formatTime(lastUpdated))")
-                                }
-                            }
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                    .onHover { hovering in
-                        hoveredSymbol = hovering ? symbol : nil
-                    }
-                }
-            }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 6) {
-                Button("偏好设置") { openPreferences() }
-                Button("关于") { NSApp.orderFrontStandardAboutPanel(nil) }
-                Button("退出") { NSApp.terminate(nil) }
-            }
-
-            if let lastUpdated {
-                Text("更新于 \(formatTime(lastUpdated))")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding(12)
-        .task {
-            await refreshPrices()
-        }
-        .onReceive(Timer.publish(every: 10, on: .main, in: .common).autoconnect()) { _ in
-            Task {
-                await refreshPrices()
-            }
+        enum CodingKeys: String, CodingKey {
+            case usd
+            case usd24hChange = "usd_24h_change"
+            case usd24hVol = "usd_24h_vol"
+            case usdMarketCap = "usd_market_cap"
+            case usd24hHigh = "usd_24h_high"
+            case usd24hLow = "usd_24h_low"
+            case lastUpdatedAt = "last_updated_at"
         }
     }
 
-    private func addSymbol() {
-        let symbol = newSymbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        guard !symbol.isEmpty else { return }
-        var current = coins
-        guard !current.contains(symbol) else {
-            newSymbol = ""
-            return
+    func searchAsset(keyword: String) async throws -> CryptoAsset? {
+        guard let encoded = keyword.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://api.coingecko.com/api/v3/search?query=\(encoded)") else {
+            return nil
         }
-        current.append(symbol)
-        coinSymbols = current.joined(separator: ",")
-        newSymbol = ""
-        Task {
-            await refreshPrices()
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let response = try JSONDecoder().decode(SearchResponse.self, from: data)
+        let normalized = keyword.lowercased()
+        let selected = response.coins.first(where: { $0.symbol.lowercased() == normalized })
+            ?? response.coins.first(where: { $0.name.lowercased() == normalized })
+            ?? response.coins.first
+        guard let selected else { return nil }
+        return CryptoAsset(
+            id: selected.id,
+            symbol: selected.symbol.uppercased(),
+            name: selected.name
+        )
+    }
+
+    func fetchQuotes(ids: [String]) async throws -> [String: CryptoQuote] {
+        guard !ids.isEmpty else { return [:] }
+        let idQuery = ids.joined(separator: ",")
+        guard let encoded = idQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(
+                string: "https://api.coingecko.com/api/v3/simple/price?ids=\(encoded)&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true&include_last_updated_at=true&include_24hr_high=true&include_24hr_low=true"
+              ) else {
+            return [:]
+        }
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let decoded = try JSONDecoder().decode([String: QuotePayload].self, from: data)
+        var result: [String: CryptoQuote] = [:]
+        for (id, payload) in decoded {
+            guard let usd = payload.usd else { continue }
+            let timestamp = TimeInterval(payload.lastUpdatedAt ?? Int(Date().timeIntervalSince1970))
+            result[id] = CryptoQuote(
+                price: usd,
+                change24h: payload.usd24hChange,
+                high24h: payload.usd24hHigh,
+                low24h: payload.usd24hLow,
+                marketCap: payload.usdMarketCap,
+                volume24h: payload.usd24hVol,
+                updatedAt: Date(timeIntervalSince1970: timestamp)
+            )
+        }
+        return result
+    }
+}
+
+@MainActor
+final class CryptoViewModel: ObservableObject {
+    @Published var watchedAssets: [CryptoAsset] = [
+        .init(id: "bitcoin", symbol: "BTC", name: "Bitcoin"),
+        .init(id: "ethereum", symbol: "ETH", name: "Ethereum"),
+        .init(id: "solana", symbol: "SOL", name: "Solana")
+    ]
+    @Published var quotes: [String: CryptoQuote] = [:]
+    @Published var queryText = ""
+    @Published var isLoading = false
+    @Published var message = ""
+
+    private let apiClient = CryptoAPIClient()
+    private var autoRefreshTask: Task<Void, Never>?
+
+    deinit {
+        autoRefreshTask?.cancel()
+    }
+
+    func startAutoRefresh() {
+        guard autoRefreshTask == nil else { return }
+        autoRefreshTask = Task { [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled {
+                await self.refreshQuotes()
+                try? await Task.sleep(for: .seconds(12))
+            }
         }
     }
 
-    private func remove(symbol: String) {
-        let updated = coins.filter { $0 != symbol }
-        coinSymbols = updated.joined(separator: ",")
-        Task {
-            await refreshPrices()
-        }
+    func stopAutoRefresh() {
+        autoRefreshTask?.cancel()
+        autoRefreshTask = nil
     }
 
-    private func openPreferences() {
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-    }
-
-    private func refreshPrices() async {
-        guard !isLoading else { return }
-        let symbols = coins.map { $0.lowercased() }.joined(separator: ",")
-        guard !symbols.isEmpty else {
-            prices = [:]
-            lastUpdated = Date()
-            return
-        }
-        isLoading = true
-        defer { isLoading = false }
-        var components = URLComponents(string: "https://api.coingecko.com/api/v3/simple/price")
-        components?.queryItems = [
-            URLQueryItem(name: "symbols", value: symbols),
-            URLQueryItem(name: "vs_currencies", value: "usd"),
-            URLQueryItem(name: "include_24hr_change", value: "true")
-        ]
-        guard let url = components?.url else { return }
+    func addAsset() async {
+        let input = queryText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !input.isEmpty else { return }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let decoded = try JSONDecoder().decode([String: CoinPrice].self, from: data)
-            var mapped: [String: CoinPrice] = [:]
-            for (key, value) in decoded {
-                mapped[key.uppercased()] = value
+            isLoading = true
+            defer { isLoading = false }
+            guard let asset = try await apiClient.searchAsset(keyword: input) else {
+                message = "没有找到币种：\(input)"
+                return
             }
-            prices = mapped
-            lastUpdated = Date()
+            if watchedAssets.contains(where: { $0.id == asset.id }) {
+                message = "\(asset.symbol) 已在列表中"
+                return
+            }
+            watchedAssets.insert(asset, at: 0)
+            queryText = ""
+            message = "已添加 \(asset.symbol)"
+            await refreshQuotes()
         } catch {
-            lastUpdated = Date()
+            message = "添加失败，请稍后重试"
         }
     }
 
-    private func formatPrice(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
-        formatter.maximumFractionDigits = 2
-        return formatter.string(from: NSNumber(value: value)) ?? "$\(value)"
+    func removeAsset(_ asset: CryptoAsset) {
+        watchedAssets.removeAll(where: { $0.id == asset.id })
+        quotes.removeValue(forKey: asset.id)
     }
 
-    private func formatChange(_ value: Double) -> String {
-        String(format: "%+.2f%%", value)
-    }
-
-    private func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
-        return formatter.string(from: date)
+    func refreshQuotes() async {
+        do {
+            let ids = watchedAssets.map(\.id)
+            let latest = try await apiClient.fetchQuotes(ids: ids)
+            quotes = latest
+        } catch {
+            message = "价格更新失败，请检查网络"
+        }
     }
 }
 
-struct CoinPrice: Decodable {
-    let usd: Double?
-    let usd24hChange: Double?
+struct CryptoDashboardView: View {
+    @StateObject private var viewModel = CryptoViewModel()
 
-    enum CodingKeys: String, CodingKey {
-        case usd
-        case usd24hChange = "usd_24h_change"
-    }
-}
-
-struct PreferencesView: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("偏好设置")
-                .font(.headline)
-            Text("当前版本暂无可配置项")
-                .foregroundColor(.secondary)
+        VStack(spacing: 18) {
+            header
+            addBar
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(viewModel.watchedAssets) { asset in
+                        CryptoRowView(asset: asset, quote: viewModel.quotes[asset.id]) {
+                            viewModel.removeAsset(asset)
+                        }
+                    }
+                }
+                .padding(.top, 8)
+            }
+        }
+        .padding(24)
+        .background(
+            LinearGradient(
+                colors: [Color(red: 0.07, green: 0.09, blue: 0.16), Color(red: 0.1, green: 0.12, blue: 0.2)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .task {
+            viewModel.startAutoRefresh()
+        }
+        .onDisappear {
+            viewModel.stopAutoRefresh()
+        }
+    }
+
+    private var header: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Crypto Watch")
+                    .font(.system(size: 34, weight: .bold))
+                Text("添加币种，实时查看价格与波动")
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("立即刷新") {
+                Task {
+                    await viewModel.refreshQuotes()
+                }
+            }
+            .buttonStyle(.borderedProminent)
+        }
+    }
+
+    private var addBar: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                TextField("输入币种代号或名称，例如 btc / solana", text: $viewModel.queryText)
+                    .textFieldStyle(.roundedBorder)
+                Button {
+                    Task {
+                        await viewModel.addAsset()
+                    }
+                } label: {
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Text("添加币种")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            if !viewModel.message.isEmpty {
+                Text(viewModel.message)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+}
+
+struct CryptoRowView: View {
+    let asset: CryptoAsset
+    let quote: CryptoQuote?
+    let onRemove: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(asset.name)
+                        .font(.headline)
+                    Text(asset.symbol)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 6) {
+                    if let quote {
+                        Text(quote.price, format: .currency(code: "USD"))
+                            .font(.title3.weight(.semibold))
+                        Text(changeText(for: quote))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(changeColor(for: quote))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(changeColor(for: quote).opacity(0.15))
+                            .clipShape(Capsule())
+                    } else {
+                        Text("加载中...")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Button("移除", action: onRemove)
+                    .buttonStyle(.bordered)
+            }
+
+            if isHovering {
+                HoverDetailPanel(quote: quote)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
         .padding(16)
-        .frame(width: 320)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white.opacity(0.07))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        )
+        .animation(.easeInOut(duration: 0.2), value: isHovering)
+        .onHover { hovering in
+            isHovering = hovering
+        }
+    }
+
+    private func changeText(for quote: CryptoQuote) -> String {
+        guard let value = quote.change24h else { return "24h --" }
+        let signal = value >= 0 ? "+" : ""
+        return "\(signal)\(String(format: "%.2f", value))%"
+    }
+
+    private func changeColor(for quote: CryptoQuote) -> Color {
+        guard let value = quote.change24h else { return .gray }
+        return value >= 0 ? .green : .red
+    }
+}
+
+struct HoverDetailPanel: View {
+    let quote: CryptoQuote?
+
+    var body: some View {
+        VStack(spacing: 8) {
+            metricRow(title: "24h 最高", value: priceText(quote?.high24h))
+            metricRow(title: "24h 最低", value: priceText(quote?.low24h))
+            metricRow(title: "市值", value: compactText(quote?.marketCap))
+            metricRow(title: "24h 成交量", value: compactText(quote?.volume24h))
+            metricRow(title: "更新时间", value: timeText(quote?.updatedAt))
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.black.opacity(0.2))
+        )
+    }
+
+    private func metricRow(title: String, value: String) -> some View {
+        HStack {
+            Text(title)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .fontWeight(.medium)
+        }
+        .font(.caption)
+    }
+
+    private func priceText(_ value: Double?) -> String {
+        guard let value else { return "--" }
+        return value.formatted(.currency(code: "USD"))
+    }
+
+    private func compactText(_ value: Double?) -> String {
+        guard let value else { return "--" }
+        return value.formatted(
+            .number
+                .notation(.compactName)
+                .precision(.fractionLength(2))
+        )
+    }
+
+    private func timeText(_ value: Date?) -> String {
+        guard let value else { return "--" }
+        return value.formatted(date: .omitted, time: .standard)
     }
 }
