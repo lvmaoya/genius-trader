@@ -1,0 +1,17 @@
+.DS_Store
+/.build
+/Packages
+/DerivedData
+.swiftpm
+xcuserdata/
+*.xcworkspace
+*.xcodeproj
+*.xcconfig
+/*.plist
+/*.png
+/*.jpg
+/*.jpeg
+/*.icns
+/*.svg
+/*.pdf
+/.TraeAI
