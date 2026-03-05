@@ -1,11 +1,24 @@
 import SwiftUI
+import AppKit
 
 @main
 struct GeniusTraderApp: App {
     var body: some Scene {
-        WindowGroup {
+        MenuBarExtra {
             CryptoDashboardView()
-                .frame(minWidth: 980, minHeight: 680)
+                .frame(minWidth: 480, minHeight: 640)
+        } label: {
+            if let url = Bundle.module.url(forResource: "MenuBarIcon", withExtension: "png"),
+               let image = NSImage(contentsOf: url) {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 18, height: 18)
+            } else {
+                Image(systemName: "bitcoinsign.circle")
+                    .font(.system(size: 14, weight: .regular))
+            }
         }
     }
 }
@@ -181,200 +194,222 @@ final class CryptoViewModel: ObservableObject {
 
 struct CryptoDashboardView: View {
     @StateObject private var viewModel = CryptoViewModel()
+    @State private var selectedAssetID: String?
 
     var body: some View {
-        VStack(spacing: 18) {
-            header
-            addBar
+        VStack(spacing: 0) {
+            actionBar
+            columnHeader
+            Divider()
             ScrollView {
-                LazyVStack(spacing: 12) {
+                LazyVStack(spacing: 0) {
                     ForEach(viewModel.watchedAssets) { asset in
-                        CryptoRowView(asset: asset, quote: viewModel.quotes[asset.id]) {
+                        CompactCryptoRowView(
+                            asset: asset,
+                            quote: viewModel.quotes[asset.id],
+                            isSelected: selectedAssetID == asset.id
+                        ) {
+                            selectedAssetID = asset.id
+                        } onRemove: {
                             viewModel.removeAsset(asset)
                         }
+                        Divider()
                     }
                 }
-                .padding(.top, 8)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(24)
-        .background(
-            LinearGradient(
-                colors: [Color(red: 0.07, green: 0.09, blue: 0.16), Color(red: 0.1, green: 0.12, blue: 0.2)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
+        .frame(width: 420, height: 620)
+        .background(Color.white)
         .task {
             viewModel.startAutoRefresh()
+            await viewModel.refreshQuotes()
+            if selectedAssetID == nil {
+                selectedAssetID = viewModel.watchedAssets.first?.id
+            }
         }
         .onDisappear {
             viewModel.stopAutoRefresh()
         }
+        .onChange(of: viewModel.watchedAssets) { assets in
+            guard !assets.isEmpty else {
+                selectedAssetID = nil
+                return
+            }
+            if let selectedAssetID,
+               assets.contains(where: { $0.id == selectedAssetID }) {
+                return
+            }
+            selectedAssetID = assets.first?.id
+        }
     }
 
-    private var header: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Crypto Watch")
-                    .font(.system(size: 34, weight: .bold))
-                Text("添加币种，实时查看价格与波动")
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Button("立即刷新") {
+    private var actionBar: some View {
+        HStack(spacing: 8) {
+            TextField("添加币种，如 btc / solana", text: $viewModel.queryText)
+                .textFieldStyle(.roundedBorder)
+            Button("添加") {
                 Task {
-                    await viewModel.refreshQuotes()
+                    await viewModel.addAsset()
+                    if selectedAssetID == nil {
+                        selectedAssetID = viewModel.watchedAssets.first?.id
+                    }
                 }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            Button("刷新") {
+                Task { await viewModel.refreshQuotes() }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
     }
 
-    private var addBar: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 10) {
-                TextField("输入币种代号或名称，例如 btc / solana", text: $viewModel.queryText)
-                    .textFieldStyle(.roundedBorder)
-                Button {
-                    Task {
-                        await viewModel.addAsset()
-                    }
-                } label: {
-                    if viewModel.isLoading {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Text("添加币种")
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            if !viewModel.message.isEmpty {
-                Text(viewModel.message)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+    private var columnHeader: some View {
+        HStack(spacing: 0) {
+            Text("名称")
+                .frame(width: 150, alignment: .leading)
+            Text("分时")
+                .frame(width: 120, alignment: .center)
+            Text("最新")
+                .frame(width: 80, alignment: .trailing)
+            Text("涨幅")
+                .frame(width: 60, alignment: .trailing)
         }
+        .font(.system(size: 11, weight: .medium))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
     }
 }
 
-struct CryptoRowView: View {
+struct CompactCryptoRowView: View {
     let asset: CryptoAsset
     let quote: CryptoQuote?
+    let isSelected: Bool
+    let onTap: () -> Void
     let onRemove: () -> Void
 
-    @State private var isHovering = false
-
     var body: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(asset.name)
-                        .font(.headline)
-                    Text(asset.symbol)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 6) {
-                    if let quote {
-                        Text(quote.price, format: .currency(code: "USD"))
-                            .font(.title3.weight(.semibold))
-                        Text(changeText(for: quote))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(changeColor(for: quote))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(changeColor(for: quote).opacity(0.15))
-                            .clipShape(Capsule())
-                    } else {
-                        Text("加载中...")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                Button("移除", action: onRemove)
-                    .buttonStyle(.bordered)
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(asset.name)
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+                Text(asset.symbol)
+                    .font(.system(size: 10))
+                    .foregroundStyle(isSelected ? Color.white.opacity(0.9) : .secondary)
+                    .lineLimit(1)
             }
+            .frame(width: 150, alignment: .leading)
 
-            if isHovering {
-                HoverDetailPanel(quote: quote)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
+            MiniTrendView(quote: quote, isSelected: isSelected)
+                .frame(width: 120, height: 24)
+
+            Text(lastPriceText)
+                .font(.system(size: 12, weight: .semibold))
+                .frame(width: 80, alignment: .trailing)
+
+            Text(changeText)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(changeColor)
+                .frame(width: 60, alignment: .trailing)
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white.opacity(0.07))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.12), lineWidth: 1)
-        )
-        .animation(.easeInOut(duration: 0.2), value: isHovering)
-        .onHover { hovering in
-            isHovering = hovering
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(isSelected ? Color(red: 0.08, green: 0.46, blue: 0.94) : Color.white)
+        .foregroundStyle(isSelected ? .white : .primary)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap()
+        }
+        .contextMenu {
+            Button("移除", role: .destructive) {
+                onRemove()
+            }
         }
     }
 
-    private func changeText(for quote: CryptoQuote) -> String {
-        guard let value = quote.change24h else { return "24h --" }
+    private var lastPriceText: String {
+        guard let price = quote?.price else { return "--" }
+        if price >= 1000 {
+            return price.formatted(.number.precision(.fractionLength(2)))
+        }
+        if price >= 1 {
+            return price.formatted(.number.precision(.fractionLength(3)))
+        }
+        return price.formatted(.number.precision(.fractionLength(6)))
+    }
+
+    private var changeText: String {
+        guard let value = quote?.change24h else { return "--" }
         let signal = value >= 0 ? "+" : ""
         return "\(signal)\(String(format: "%.2f", value))%"
     }
 
-    private func changeColor(for quote: CryptoQuote) -> Color {
-        guard let value = quote.change24h else { return .gray }
-        return value >= 0 ? .green : .red
+    private var changeColor: Color {
+        guard let value = quote?.change24h else {
+            return isSelected ? .white : .secondary
+        }
+        if isSelected {
+            return .white
+        }
+        return value >= 0 ? Color(red: 0.12, green: 0.62, blue: 0.24) : Color(red: 0.9, green: 0.18, blue: 0.2)
     }
 }
 
-struct HoverDetailPanel: View {
+struct MiniTrendView: View {
     let quote: CryptoQuote?
+    let isSelected: Bool
 
     var body: some View {
-        VStack(spacing: 8) {
-            metricRow(title: "24h 最高", value: priceText(quote?.high24h))
-            metricRow(title: "24h 最低", value: priceText(quote?.low24h))
-            metricRow(title: "市值", value: compactText(quote?.marketCap))
-            metricRow(title: "24h 成交量", value: compactText(quote?.volume24h))
-            metricRow(title: "更新时间", value: timeText(quote?.updatedAt))
+        GeometryReader { proxy in
+            let size = proxy.size
+            let points = trendPoints(width: size.width, height: size.height)
+            Path { path in
+                guard let first = points.first else { return }
+                path.move(to: first)
+                for point in points.dropFirst() {
+                    path.addLine(to: point)
+                }
+            }
+            .stroke(strokeColor, style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round))
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.black.opacity(0.2))
-        )
     }
 
-    private func metricRow(title: String, value: String) -> some View {
-        HStack {
-            Text(title)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text(value)
-                .fontWeight(.medium)
+    private var strokeColor: Color {
+        guard let change = quote?.change24h else {
+            return isSelected ? .white : .gray
         }
-        .font(.caption)
+        if isSelected {
+            return .white
+        }
+        return change >= 0 ? Color(red: 0.12, green: 0.62, blue: 0.24) : Color(red: 0.9, green: 0.18, blue: 0.2)
     }
 
-    private func priceText(_ value: Double?) -> String {
-        guard let value else { return "--" }
-        return value.formatted(.currency(code: "USD"))
+    private func trendPoints(width: CGFloat, height: CGFloat) -> [CGPoint] {
+        let baseline = [0.24, 0.52, 0.44, 0.58, 0.49, 0.61, 0.56, 0.63, 0.55, 0.69, 0.64, 0.74]
+        let seed = max(0.05, min(0.95, normalizedSeed))
+        let variation = baseline.enumerated().map { index, value in
+            let shift = sin(Double(index) * 0.75 + seed * 3.2) * 0.08
+            return max(0.08, min(0.92, value + shift))
+        }
+        let count = variation.count
+        return variation.enumerated().map { index, value in
+            let x = CGFloat(index) * (width / CGFloat(max(1, count - 1)))
+            let y = height - CGFloat(value) * height
+            return CGPoint(x: x, y: y)
+        }
     }
 
-    private func compactText(_ value: Double?) -> String {
-        guard let value else { return "--" }
-        return value.formatted(
-            .number
-                .notation(.compactName)
-                .precision(.fractionLength(2))
-        )
-    }
-
-    private func timeText(_ value: Date?) -> String {
-        guard let value else { return "--" }
-        return value.formatted(date: .omitted, time: .standard)
+    private var normalizedSeed: Double {
+        guard let quote else { return 0.33 }
+        let low = quote.low24h ?? quote.price * 0.9
+        let high = quote.high24h ?? quote.price * 1.1
+        guard high > low else { return 0.5 }
+        return (quote.price - low) / (high - low)
     }
 }
