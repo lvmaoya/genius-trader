@@ -15,6 +15,7 @@ public struct MarketListView: View {
     }
 
     @State private var hoveredItemID: UUID?
+    @State private var isClearConfirmPresented = false
 
     public var body: some View {
         VStack(spacing: 0) {
@@ -109,6 +110,15 @@ public struct MarketListView: View {
                 selectedItemID = viewModel.items[0].id
             }
         }
+        .alert("确认清空？", isPresented: $isClearConfirmPresented) {
+            Button("取消", role: .cancel) {}
+            Button("确认", role: .destructive) {
+                viewModel.items.removeAll()
+                selectedItemID = nil
+            }
+        } message: {
+            Text("将移出全部自选项，无法撤销。")
+        }
     }
 
     private var filteredItems: [MarketItem] {
@@ -118,8 +128,14 @@ public struct MarketListView: View {
     }
 
     private func handleMenuAction(_ menuItem: MenuItem) {
+        if menuItem.title == "清空" {
+            isClearConfirmPresented = true
+            return
+        }
+
         if menuItem.title == "退出" {
             onQuit?()
+            return
         }
     }
 }

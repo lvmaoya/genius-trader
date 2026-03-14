@@ -32,9 +32,8 @@ public final class MarketViewModel: ObservableObject {
         ]
 
         menuItems = [
-            MenuItem(title: "高榜", code: "⌘ 1"),
-            MenuItem(title: "板块全览", code: "⌘ 2"),
-            MenuItem(title: "关于", code: "⌘ 3"),
+            MenuItem(title: "清空", code: "⌘ 1"),
+            MenuItem(title: "设置", code: "⌘ 2"),
             MenuItem(title: "退出", code: "⌘ Q")
         ]
     }
