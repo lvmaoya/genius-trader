@@ -3,13 +3,15 @@ import Foundation
 public struct MarketItem: Identifiable, Hashable {
     public let id = UUID()
     public let name: String
+    public let code: String
     public let price: Double
     public let changePercentage: Double
     public let isRising: Bool
     public let trend: [Double]
 
-    public init(name: String, price: Double, changePercentage: Double, isRising: Bool, trend: [Double]) {
+    public init(name: String, code: String, price: Double, changePercentage: Double, isRising: Bool, trend: [Double]) {
         self.name = name
+        self.code = code
         self.price = price
         self.changePercentage = changePercentage
         self.isRising = isRising

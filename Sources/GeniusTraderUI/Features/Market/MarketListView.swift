@@ -8,7 +8,7 @@ public struct MarketListView: View {
 
     private let textGreen = Color(red: 0.12, green: 0.62, blue: 0.24)
     private let textRed = Color(red: 0.9, green: 0.18, blue: 0.2)
-    private let selectedColor = Color(red: 0.25, green: 0.52, blue: 0.96)
+    private let selectedColor = Color(hex: 0x4690fc)
 
     public init(onQuit: (() -> Void)? = nil) {
         self.onQuit = onQuit
@@ -21,18 +21,18 @@ public struct MarketListView: View {
             HStack(spacing: 8) {
                 Text("Genider")
                     .font(.system(size: 14))
-                    .foregroundStyle(Color.gray.opacity(0.6))
+                    .foregroundStyle(Color(hex: 0x999999))
                 
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 14))
-                        .foregroundStyle(Color.gray)
+                        .foregroundStyle(Color(hex: 0x999999))
                     
                     ZStack(alignment: .leading) {
                         if viewModel.searchText.isEmpty {
                             Text("搜索")
-                                .font(.system(size: 14))
-                                .foregroundStyle(Color.gray.opacity(0.6))
+                                .font(.system(size: 13))
+                                .foregroundStyle(Color(hex: 0x999999))
                         }
                         TextField("", text: $viewModel.searchText)
                             .textFieldStyle(.plain)
@@ -44,7 +44,8 @@ public struct MarketListView: View {
                 .background(Color(white: 0.95))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             }
-            .padding(12)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
 
             ScrollView {
                 LazyVStack(spacing: 0) {
@@ -76,6 +77,7 @@ public struct MarketListView: View {
             .scrollContentBackground(.hidden)
 
             Divider()
+                .padding(.horizontal, 12)
 
             VStack(spacing: 0) {
                 ForEach(viewModel.menuItems) { menuItem in
@@ -130,18 +132,18 @@ struct MenuRowView: View {
     var body: some View {
         HStack {
             Text(item.title)
-                .font(.system(size: 13))
-                .foregroundStyle(isSelected ? .white : .black)
+                .font(.system(size: 14))
+                .foregroundStyle(isSelected ? .white : Color(hex: 0x333333))
             Spacer()
             Text(item.code)
-                .font(.system(size: 13))
-                .foregroundStyle(isSelected ? .white : Color.gray.opacity(0.8))
+                .font(.system(size: 12))
+                .foregroundStyle(isSelected ? .white : Color(hex: 0x999999))
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.vertical, 4)
         .background(isSelected ? selectedColor : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 6))
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 3)
     }
 }
 
