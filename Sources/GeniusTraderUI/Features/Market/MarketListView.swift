@@ -42,7 +42,6 @@ public struct MarketListView: View {
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
-                .background(Color(white: 0.95))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             }
             .padding(.horizontal, 12)
@@ -75,7 +74,7 @@ public struct MarketListView: View {
                 }
                 .padding(.bottom, 8)
             }
-            .scrollContentBackground(.hidden)
+            .scrollIndicators(.hidden)
 
             Divider()
                 .padding(.horizontal, 12)
@@ -101,10 +100,16 @@ public struct MarketListView: View {
                     }
                 }
             }
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .padding(.horizontal, 4)
             .padding(.top, 4)
-            .padding(.bottom, 8)
+            .padding(.bottom, 4)
         }
-        .background(Color.white)
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.white.opacity(0.8), lineWidth: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 10))
         .onAppear {
             if viewModel.items.count > 0 {
                 selectedItemID = viewModel.items[0].id

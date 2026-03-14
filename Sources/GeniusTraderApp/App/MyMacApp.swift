@@ -9,7 +9,7 @@ struct GeniusTraderApp: App {
             MarketListView(onQuit: {
                 NSApplication.shared.terminate(nil)
             })
-                .frame(minWidth: 320, minHeight: 900)
+                .frame(width: 360, height: 560)
         } label: {
             if let image = menuBarIcon {
                 Image(nsImage: image)
@@ -22,6 +22,7 @@ struct GeniusTraderApp: App {
                     .font(.system(size: 14, weight: .regular))
             }
         }
+        .menuBarExtraStyle(.window)
     }
 
     private var menuBarIcon: NSImage? {
