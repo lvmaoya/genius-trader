@@ -2,8 +2,9 @@ import SwiftUI
 
 public struct MarketListView: View {
     @StateObject private var viewModel = MarketViewModel()
-    @State private var selectedItemID: UUID?
+    @State private var selectedItemID: String?
     @State private var selectedMenuItemID: UUID?
+    @FocusState private var isSearchFieldFocused: Bool
     private let onQuit: (() -> Void)?
 
     private let textGreen = Color(red: 0.12, green: 0.62, blue: 0.24)
@@ -38,6 +39,10 @@ public struct MarketListView: View {
                         TextField("", text: $viewModel.searchText)
                             .textFieldStyle(.plain)
                             .font(.system(size: 14))
+                            .focused($isSearchFieldFocused)
+                            .onSubmit {
+                                isSearchFieldFocused = false
+                            }
                     }
                 }
                 .padding(.horizontal, 8)
@@ -47,33 +52,72 @@ public struct MarketListView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
 
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(filteredItems) { item in
-                        MarketRowView(
-                            item: item,
-                            isSelected: selectedItemID == item.id,
-                            isHovered: false,
-                            greenColor: textGreen,
-                            redColor: textRed,
-                            selectedColor: selectedColor
-                        )
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            selectedItemID = item.id
-                            selectedMenuItemID = nil
-                        }
-                        .onHover { isHovered in
-                            if isHovered {
-                                selectedItemID = item.id
-                                selectedMenuItemID = nil
+            Group {
+                if viewModel.items.isEmpty && !viewModel.isSearching {
+                    EmptyWatchlistView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.horizontal, 24)
+                } else {
+                    ScrollView {
+                    LazyVStack(spacing: 0) {
+                        if viewModel.isSearching {
+                            ForEach(viewModel.searchResults) { item in
+                                if viewModel.isInWatchlist(item) {
+                                    if let watchlistItem = viewModel.watchlistItem(for: item) {
+                                        MarketRowView(
+                                            item: watchlistItem,
+                                            isSelected: selectedItemID == watchlistItem.id,
+                                            isHovered: false,
+                                            greenColor: textGreen,
+                                            redColor: textRed,
+                                            selectedColor: selectedColor
+                                        )
+                                        .contentShape(Rectangle())
+                                        .onTapGesture {
+                                            selectedItemID = watchlistItem.id
+                                            selectedMenuItemID = nil
+                                        }
+                                    }
+                                } else {
+                                    SearchResultRowView(
+                                        item: item,
+                                        onAdd: {
+                                            viewModel.addToWatchlist(item)
+                                        },
+                                        selectedColor: selectedColor
+                                    )
+                                }
+                            }
+                        } else {
+                            ForEach(viewModel.items) { item in
+                                MarketRowView(
+                                    item: item,
+                                    isSelected: selectedItemID == item.id,
+                                    isHovered: false,
+                                    greenColor: textGreen,
+                                    redColor: textRed,
+                                    selectedColor: selectedColor
+                                )
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    selectedItemID = item.id
+                                    selectedMenuItemID = nil
+                                }
+                                .onHover { isHovered in
+                                    if isHovered {
+                                        selectedItemID = item.id
+                                        selectedMenuItemID = nil
+                                    }
+                                }
+                                .tag(item.id)
                             }
                         }
-                        .tag(item.id)
                     }
+                    .padding(.bottom, 8)
                 }
-                .padding(.bottom, 8)
             }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .scrollIndicators(.hidden)
 
             Divider()
@@ -111,25 +155,19 @@ public struct MarketListView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .onAppear {
-            if viewModel.items.count > 0 {
-                selectedItemID = viewModel.items[0].id
-            }
+            selectedItemID = nil
+            selectedMenuItemID = nil
+            isSearchFieldFocused = false
         }
         .alert("确认清空？", isPresented: $isClearConfirmPresented) {
             Button("取消", role: .cancel) {}
             Button("确认", role: .destructive) {
-                viewModel.items.removeAll()
+                viewModel.clearWatchlist()
                 selectedItemID = nil
             }
         } message: {
             Text("将移出全部自选项，无法撤销。")
         }
-    }
-
-    private var filteredItems: [MarketItem] {
-        let keyword = viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !keyword.isEmpty else { return viewModel.items }
-        return viewModel.items.filter { $0.name.localizedCaseInsensitiveContains(keyword) }
     }
 
     private func handleMenuAction(_ menuItem: MenuItem) {
@@ -165,6 +203,19 @@ struct MenuRowView: View {
         .background(isSelected ? selectedColor : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .padding(.horizontal, 3)
+    }
+}
+
+struct EmptyWatchlistView: View {
+    var body: some View {
+        VStack {
+            Spacer()
+            Text("在上方搜索币种后，点击添加")
+                .font(.system(size: 12))
+                .foregroundStyle(Color(hex: 0x9CA3AF))
+                .multilineTextAlignment(.center)
+            Spacer()
+        }
     }
 }
 

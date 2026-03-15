@@ -45,10 +45,53 @@ struct MarketRowView: View {
         if price >= 1000 {
             return String(format: "%.0f", price)
         }
-        return String(format: "%.2f", price)
+        if price >= 1 {
+            return String(format: "%.2f", price)
+        }
+        if price >= 0.01 {
+            return String(format: "%.4f", price)
+        }
+        return String(format: "%.6f", price)
     }
 
     private func formatChange(_ change: Double) -> String {
         String(format: "%.2f%%", change)
+    }
+}
+
+struct SearchResultRowView: View {
+    let item: MarketSearchItem
+    let onAdd: () -> Void
+    let selectedColor: Color
+
+    var body: some View {
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.name)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(hex: 0x333333))
+
+                Text(item.code)
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color(hex: 0x999999))
+            }
+            .frame(width: 120, alignment: .leading)
+
+            Spacer()
+
+            Button(action: onAdd) {
+                Text("添加")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(width: 56)
+                    .padding(.vertical, 6)
+                    .background(selectedColor)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 6)
     }
 }
