@@ -63,6 +63,7 @@ struct SearchResultRowView: View {
     let item: MarketSearchItem
     let onAdd: () -> Void
     let selectedColor: Color
+    let isHovered: Bool
 
     var body: some View {
         HStack(spacing: 0) {
@@ -92,6 +93,8 @@ struct SearchResultRowView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
+        .background(isHovered ? selectedColor.opacity(0.12) : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
         .padding(.horizontal, 6)
     }
 }
