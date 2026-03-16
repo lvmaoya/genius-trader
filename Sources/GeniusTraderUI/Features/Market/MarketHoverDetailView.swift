@@ -26,61 +26,17 @@ struct MarketHoverDetailView: View {
         snapshot.isRising ? redColor : greenColor
     }
 
+    private var secondaryAccentColor: Color {
+        accentColor.opacity(0.7)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(snapshot.name)
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(Color(hex: 0x333333))
-
-                    Text(snapshot.code)
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color(hex: 0x999999))
-                }
-
-                Spacer()
-
-                Text(snapshot.isInWatchlist ? "自选" : "搜索")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color(hex: 0x999999))
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 12)
-            .padding(.bottom, 10)
-
-            Divider()
-                .padding(.horizontal, 12)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(snapshot.priceText)
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(accentColor)
-
-                Text(snapshot.changeText)
-                    .font(.system(size: 12))
-                    .foregroundStyle(accentColor)
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 12)
-
-            SimpleSparkline(data: snapshot.trend, color: accentColor)
-                .frame(height: 48)
-                .padding(.horizontal, 12)
-                .padding(.top, 12)
-
-            VStack(alignment: .leading, spacing: 8) {
-                hoverInfoRow(title: "产品", value: snapshot.productID)
-                hoverInfoRow(
-                    title: "状态",
-                    value: snapshot.isInWatchlist ? "已在自选列表中" : "悬停预览，点击即可添加"
-                )
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 12)
-
-            Spacer(minLength: 12)
+        VStack(alignment: .leading, spacing: 16) {
+            headerSection
+            optionSection
+            Spacer(minLength: 0)
         }
+        .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // 外层系统面板样式由 NSVisualEffectView 提供，这里只保留内容排版。
         .background(Color.clear)
@@ -89,20 +45,68 @@ struct MarketHoverDetailView: View {
         }
     }
 
-    /// 浮窗底部的说明行，用统一的小字号格式展示元信息。
-    private func hoverInfoRow(title: String, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(title)
-                .font(.system(size: 11))
-                .foregroundStyle(Color(hex: 0x999999))
-                .frame(width: 28, alignment: .leading)
+    private var headerSection: some View {
+        HStack(alignment: .center, spacing: 18) {
+            VStack(alignment: .leading) {
+                Text(snapshot.priceText)
+                    .font(.system(size: 26, weight: .medium))
+                    .foregroundStyle(accentColor)
 
-            Text(value)
-                .font(.system(size: 11))
-                .foregroundStyle(Color(hex: 0x333333))
-                .lineLimit(2)
+                Text(snapshot.changeText)
+                    .font(.system(size: 16))
+                    .foregroundStyle(accentColor)
+            }
+            .frame(width: 120, alignment: .leading)
 
             Spacer(minLength: 0)
+
+            VStack(alignment: .leading, spacing: 6) {
+                metricGridRow(leftTitle: "产品", leftValue: snapshot.productID, rightTitle: "状态", rightValue: snapshot.isInWatchlist ? "自选" : "搜索")
+                metricGridRow(leftTitle: "趋势", leftValue: snapshot.isRising ? "上涨" : "回落", rightTitle: "图表", rightValue: "分时")
+            }
         }
     }
+
+    private var optionSection: some View {
+        HStack(spacing: 12) {
+            optionPill(title: "分时", isSelected: true)
+            optionPill(title: "五日")
+            optionPill(title: "日K")
+            optionPill(title: "周K")
+            optionPill(title: "月K")
+        }
+    }
+
+    private func metricGridRow(leftTitle: String, leftValue: String, rightTitle: String, rightValue: String) -> some View {
+        HStack(spacing: 18) {
+            metricCell(title: leftTitle, value: leftValue)
+            metricCell(title: rightTitle, value: rightValue)
+        }
+    }
+
+    private func metricCell(title: String, value: String) -> some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .font(.system(size: 12))
+                .foregroundStyle(Color(hex: 0x999999))
+
+            Text(value)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Color(hex: 0x333333))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func optionPill(title: String, isSelected: Bool = false) -> some View {
+        Text(title)
+            .font(.system(size: 13, weight: .medium))
+        .foregroundStyle(isSelected ? Color.white : Color(hex: 0x444444))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+        .background(
+            Capsule()
+                .fill(isSelected ? Color.black : Color.white.opacity(0.45))
+        )
+    }
+
 }

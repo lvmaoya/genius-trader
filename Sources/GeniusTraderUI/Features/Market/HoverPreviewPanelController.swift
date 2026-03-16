@@ -5,7 +5,7 @@ import AppKit
 /// 左侧 hover 详情弹层的控制器。
 /// 这里改用系统 `NSPopover`，不再自己维护一套仿系统的独立 NSPanel 外观。
 final class HoverPreviewPanelController: ObservableObject {
-    private let popoverSize = NSSize(width: 248, height: 280)
+    private let popoverSize = NSSize(width: 360, height: 430)
 
     private let popover = NSPopover()
     private var hostingController: NSHostingController<AnyView>?
