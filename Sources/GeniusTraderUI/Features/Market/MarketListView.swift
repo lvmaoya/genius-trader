@@ -14,6 +14,10 @@ public struct MarketListView: View {
     @State private var selectedMenuItemID: UUID?
     /// 当前鼠标悬停的币种，仅用于临时高亮与左侧预览。
     @State private var hoveredProductID: String?
+    /// 鼠标当前是否正在 popover 内容区域内。
+    @State private var isHoveringPopover = false
+    /// 用于给 popover 关闭增加一点缓冲，避免从列表行移向 popover 的过程中瞬间关闭。
+    @State private var pendingPopoverHideWorkItem: DispatchWorkItem?
     /// 列表中每一行的 frame，供独立浮窗做定位。
     @State private var rowFrames: [String: CGRect] = [:]
     /// 当前 SwiftUI 对应的宿主 NSView。系统 popover 需要依附在真实 AppKit 视图上展示。
@@ -172,6 +176,8 @@ public struct MarketListView: View {
                     }
                     .onHover { isHovered in
                         if isHovered {
+                            cancelPendingPopoverHide()
+                            isHoveringPopover = false
                             selectedMenuItemID = menuItem.id
                             selectedItemID = nil
                             hoveredProductID = nil
@@ -223,6 +229,7 @@ public struct MarketListView: View {
         }
         .onDisappear {
             // 主界面关闭时，主动收起左侧 popover。
+            cancelPendingPopoverHide()
             hoverPreviewController.hide()
         }
         .alert("确认清空？", isPresented: $isClearConfirmPresented) {
@@ -252,7 +259,14 @@ public struct MarketListView: View {
     /// 统一处理 hover 行为。
     /// hover 不会写入本地存储，但如果 hover 到的是自选项，会同步更新当前页面高亮。
     private func handleHoverChange(isHovered: Bool, productID: String, selectedID: String?) {
-        hoveredProductID = isHovered ? productID : nil
+        if isHovered {
+            cancelPendingPopoverHide()
+            isHoveringPopover = false
+            hoveredProductID = productID
+        } else {
+            schedulePopoverHide(for: productID)
+        }
+
         if isHovered, let selectedID {
             selectedItemID = selectedID
             selectedMenuItemID = nil
@@ -294,7 +308,8 @@ public struct MarketListView: View {
             hostView: hostView,
             rowFrame: rowFrame,
             greenColor: textGreen,
-            redColor: textRed
+            redColor: textRed,
+            onPopoverHoverChange: handlePopoverHoverChange
         )
     }
 
@@ -368,6 +383,35 @@ public struct MarketListView: View {
                 selectedItemID = nil
             }
         }
+    }
+
+    /// 当鼠标进入 popover 时取消关闭；离开时延迟关闭，给用户留出一点移动和点击缓冲。
+    private func handlePopoverHoverChange(_ isHovered: Bool) {
+        isHoveringPopover = isHovered
+
+        if isHovered {
+            cancelPendingPopoverHide()
+        } else if let hoveredProductID {
+            schedulePopoverHide(for: hoveredProductID)
+        }
+    }
+
+    /// 延迟关闭 popover，解决“鼠标刚离开列表行、正要进入 popover 时就被关掉”的问题。
+    private func schedulePopoverHide(for productID: String) {
+        cancelPendingPopoverHide()
+
+        let workItem = DispatchWorkItem {
+            guard !isHoveringPopover, hoveredProductID == productID else { return }
+            hoveredProductID = nil
+        }
+
+        pendingPopoverHideWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: workItem)
+    }
+
+    private func cancelPendingPopoverHide() {
+        pendingPopoverHideWorkItem?.cancel()
+        pendingPopoverHideWorkItem = nil
     }
 }
 

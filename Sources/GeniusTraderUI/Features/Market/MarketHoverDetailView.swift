@@ -19,6 +19,7 @@ struct MarketHoverDetailView: View {
     let snapshot: MarketHoverSnapshot
     let greenColor: Color
     let redColor: Color
+    let onHoverChange: ((Bool) -> Void)?
 
     /// 根据涨跌方向切换主强调色，与右侧列表保持一致。
     private var accentColor: Color {
@@ -83,6 +84,9 @@ struct MarketHoverDetailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // 外层系统面板样式由 NSVisualEffectView 提供，这里只保留内容排版。
         .background(Color.clear)
+        .onHover { isHovered in
+            onHoverChange?(isHovered)
+        }
     }
 
     /// 浮窗底部的说明行，用统一的小字号格式展示元信息。

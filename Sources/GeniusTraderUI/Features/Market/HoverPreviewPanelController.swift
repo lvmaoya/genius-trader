@@ -29,7 +29,8 @@ final class HoverPreviewPanelController: ObservableObject {
         hostView: NSView,
         rowFrame: CGRect,
         greenColor: Color,
-        redColor: Color
+        redColor: Color,
+        onPopoverHoverChange: @escaping (Bool) -> Void
     ) {
         attachedView = hostView
 
@@ -37,7 +38,8 @@ final class HoverPreviewPanelController: ObservableObject {
             MarketHoverDetailView(
                 snapshot: snapshot,
                 greenColor: greenColor,
-                redColor: redColor
+                redColor: redColor,
+                onHoverChange: onPopoverHoverChange
             )
             .frame(width: popoverSize.width, height: popoverSize.height)
         )
