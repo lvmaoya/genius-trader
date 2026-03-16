@@ -89,6 +89,18 @@ public final class MarketViewModel: ObservableObject {
         updateSubscriptions()
     }
 
+    /// 从自选列表移除一个币种，并同步更新本地持久化与实时订阅。
+    public func removeFromWatchlist(productID: String) {
+        guard let index = watchlistProductIDs.firstIndex(of: productID) else { return }
+
+        watchlistProductIDs.remove(at: index)
+        persistWatchlist()
+
+        allItems.removeAll { $0.productID == productID }
+        hourlyTrendByProductID.removeValue(forKey: productID)
+        updateSubscriptions()
+    }
+
     public func clearWatchlist() {
         watchlistProductIDs.removeAll()
         MarketSelectionStore.clearWatchlistProductIDs()

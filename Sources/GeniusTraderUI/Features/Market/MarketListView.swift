@@ -96,6 +96,11 @@ public struct MarketListView: View {
                                                 selectItem(withID: watchlistItem.id)
                                                 selectedMenuItemID = nil
                                             }
+                                            .contextMenu {
+                                                Button("移除自选", role: .destructive) {
+                                                    removeWatchlistItem(productID: watchlistItem.productID, itemID: watchlistItem.id)
+                                                }
+                                            }
                                             .onHover { isHovered in
                                                 handleHoverChange(
                                                     isHovered: isHovered,
@@ -139,6 +144,11 @@ public struct MarketListView: View {
                                     .onTapGesture {
                                         selectItem(withID: item.id)
                                         selectedMenuItemID = nil
+                                    }
+                                    .contextMenu {
+                                        Button("移除自选", role: .destructive) {
+                                            removeWatchlistItem(productID: item.productID, itemID: item.id)
+                                        }
                                     }
                                     .onHover { isHovered in
                                         handleHoverChange(
@@ -290,6 +300,23 @@ public struct MarketListView: View {
     private func selectItem(withID id: String) {
         selectedItemID = id
         MarketSelectionStore.saveSelectedItemID(id)
+    }
+
+    /// 统一处理右键移除自选。
+    /// 如果移除的是当前选中项或当前 hover 预览项，需要把对应状态一起清掉，避免 UI 残留。
+    private func removeWatchlistItem(productID: String, itemID: String) {
+        viewModel.removeFromWatchlist(productID: productID)
+
+        if selectedItemID == itemID {
+            selectedItemID = nil
+            MarketSelectionStore.clearSelectedItemID()
+        }
+
+        if hoveredProductID == productID {
+            cancelPendingPopoverHide()
+            isHoveringPopover = false
+            hoveredProductID = nil
+        }
     }
 
     /// 根据当前 hover 的目标和该行的位置，刷新左侧系统 popover。
