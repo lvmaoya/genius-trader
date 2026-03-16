@@ -351,7 +351,12 @@ public struct MarketListView: View {
                 code: item.code,
                 productID: item.productID,
                 priceText: formatPrice(item.price),
+                moneyChangeText: formatMoneyChange(price: item.price, changePercentage: item.changePercentage),
                 changeText: formatChange(item.changePercentage),
+                high24hText: formatPrice(item.high24h),
+                low24hText: formatPrice(item.low24h),
+                volume24hText: formatCompactAmount(item.volume24h),
+                turnover24hText: formatCompactAmount(item.volume24h * item.price),
                 isRising: item.isRising,
                 trend: item.trend,
                 isInWatchlist: true
@@ -364,7 +369,12 @@ public struct MarketListView: View {
                 code: searchItem.code,
                 productID: searchItem.productID,
                 priceText: "未添加",
+                moneyChangeText: "--",
                 changeText: "搜索结果",
+                high24hText: "--",
+                low24hText: "--",
+                volume24hText: "--",
+                turnover24hText: "--",
                 isRising: true,
                 trend: Array(repeating: 0.5, count: 12),
                 isInWatchlist: false
@@ -393,6 +403,55 @@ public struct MarketListView: View {
 
     private func formatChange(_ change: Double) -> String {
         String(format: "%@%.2f%%", change >= 0 ? "+" : "", change)
+    }
+
+    /// 根据现价和涨跌幅反推出当前相对前收的涨跌金额，供详情面板展示。
+    private func formatMoneyChange(price: Double, changePercentage: Double) -> String {
+        guard price > 0 else { return "--" }
+
+        let denominator = 1 + (changePercentage / 100)
+        guard abs(denominator) > .ulpOfOne else { return "--" }
+
+        let previousClose = price / denominator
+        let changeAmount = price - previousClose
+        let sign = changeAmount >= 0 ? "+" : "-"
+        let absoluteValue = abs(changeAmount)
+
+        if absoluteValue >= 1000 {
+            return String(format: "%@%.0f", sign, absoluteValue)
+        }
+        if absoluteValue >= 1 {
+            return String(format: "%@%.2f", sign, absoluteValue)
+        }
+        if absoluteValue >= 0.01 {
+            return String(format: "%@%.4f", sign, absoluteValue)
+        }
+        return String(format: "%@%.6f", sign, absoluteValue)
+    }
+
+    private func formatCompactAmount(_ value: Double) -> String {
+        guard value > 0 else { return "--" }
+
+        let units: [(threshold: Double, suffix: String)] = [
+            (100_000_000, "亿"),
+            (10_000, "万")
+        ]
+
+        for unit in units where value >= unit.threshold {
+            let normalized = value / unit.threshold
+            if normalized >= 100 {
+                return String(format: "%.0f%@", normalized, unit.suffix)
+            }
+            return String(format: "%.2f%@", normalized, unit.suffix)
+        }
+
+        if value >= 1000 {
+            return String(format: "%.0f", value)
+        }
+        if value >= 1 {
+            return String(format: "%.2f", value)
+        }
+        return String(format: "%.4f", value)
     }
 
     /// 恢复上次持久化的选中项。

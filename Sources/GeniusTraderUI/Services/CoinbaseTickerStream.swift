@@ -4,6 +4,9 @@ struct CoinbaseTickerUpdate {
     let productID: String
     let lastPrice: Double
     let changePercentage: Double
+    let high24h: Double
+    let low24h: Double
+    let volume24h: Double
 }
 
 final class CoinbaseTickerStream {
@@ -104,6 +107,9 @@ final class CoinbaseTickerStream {
         }
 
         let openPrice = Double(payload.open24h ?? "") ?? lastPrice
+        let high24h = Double(payload.high24h ?? "") ?? lastPrice
+        let low24h = Double(payload.low24h ?? "") ?? lastPrice
+        let volume24h = Double(payload.volume24h ?? "") ?? 0
         let changePercentage: Double
         if openPrice == 0 {
             changePercentage = 0
@@ -115,7 +121,10 @@ final class CoinbaseTickerStream {
             CoinbaseTickerUpdate(
                 productID: productID,
                 lastPrice: lastPrice,
-                changePercentage: changePercentage
+                changePercentage: changePercentage,
+                high24h: high24h,
+                low24h: low24h,
+                volume24h: volume24h
             )
         )
     }
@@ -158,11 +167,17 @@ private struct CoinbaseTickerPayload: Decodable {
     let productID: String?
     let price: String?
     let open24h: String?
+    let high24h: String?
+    let low24h: String?
+    let volume24h: String?
 
     enum CodingKeys: String, CodingKey {
         case type
         case productID = "product_id"
         case price
         case open24h = "open_24h"
+        case high24h = "high_24h"
+        case low24h = "low_24h"
+        case volume24h = "volume_24h"
     }
 }

@@ -7,7 +7,12 @@ struct MarketHoverSnapshot {
     let code: String
     let productID: String
     let priceText: String
+    let moneyChangeText: String
     let changeText: String
+    let high24hText: String
+    let low24hText: String
+    let volume24hText: String
+    let turnover24hText: String
     let isRising: Bool
     let trend: [Double]
     let isInWatchlist: Bool
@@ -49,10 +54,10 @@ struct MarketHoverDetailView: View {
         HStack(alignment: .center, spacing: 18) {
             VStack(alignment: .leading) {
                 Text(snapshot.priceText)
-                    .font(.system(size: 26, weight: .medium))
+                    .font(.system(size: 32, weight: .medium))
                     .foregroundStyle(accentColor)
 
-                Text(snapshot.changeText)
+                Text("\(snapshot.moneyChangeText)  \(snapshot.changeText)")
                     .font(.system(size: 16))
                     .foregroundStyle(accentColor)
             }
@@ -60,9 +65,9 @@ struct MarketHoverDetailView: View {
 
             Spacer(minLength: 0)
 
-            VStack(alignment: .leading, spacing: 6) {
-                metricGridRow(leftTitle: "产品", leftValue: snapshot.productID, rightTitle: "状态", rightValue: snapshot.isInWatchlist ? "自选" : "搜索")
-                metricGridRow(leftTitle: "趋势", leftValue: snapshot.isRising ? "上涨" : "回落", rightTitle: "图表", rightValue: "分时")
+            VStack(alignment: .leading, spacing: 12) {
+                metricGridRow(leftTitle: "24高", leftValue: snapshot.high24hText, rightTitle: "24低", rightValue: snapshot.low24hText)
+                metricGridRow(leftTitle: "24量", leftValue: snapshot.volume24hText, rightTitle: "24额", rightValue: snapshot.turnover24hText)
             }
         }
     }
@@ -91,7 +96,7 @@ struct MarketHoverDetailView: View {
                 .foregroundStyle(Color(hex: 0x999999))
 
             Text(value)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 12))
                 .foregroundStyle(Color(hex: 0x333333))
         }
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -79,6 +79,9 @@ public final class MarketViewModel: ObservableObject {
                     price: 0,
                     changePercentage: 0,
                     isRising: true,
+                    high24h: 0,
+                    low24h: 0,
+                    volume24h: 0,
                     trend: hourlyTrendByProductID[item.productID] ?? Array(repeating: 0.5, count: 12)
                 )
             )
@@ -142,6 +145,9 @@ public final class MarketViewModel: ObservableObject {
             price: update.lastPrice,
             changePercentage: update.changePercentage,
             isRising: update.changePercentage >= 0,
+            high24h: update.high24h,
+            low24h: update.low24h,
+            volume24h: update.volume24h,
             trend: hourlyTrendByProductID[update.productID] ?? current.trend
         )
     }
@@ -179,6 +185,9 @@ public final class MarketViewModel: ObservableObject {
             price: 0,
             changePercentage: 0,
             isRising: true,
+            high24h: 0,
+            low24h: 0,
+            volume24h: 0,
             trend: hourlyTrendByProductID[productID] ?? Array(repeating: 0.5, count: 12)
         )
     }
@@ -198,6 +207,9 @@ public final class MarketViewModel: ObservableObject {
                     price: current.price,
                     changePercentage: current.changePercentage,
                     isRising: current.isRising,
+                    high24h: current.high24h,
+                    low24h: current.low24h,
+                    volume24h: current.volume24h,
                     trend: trend
                 )
             }
