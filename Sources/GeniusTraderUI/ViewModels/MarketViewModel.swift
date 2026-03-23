@@ -11,6 +11,8 @@ public final class MarketViewModel: ObservableObject {
     @Published public var menuItems: [MenuItem] = []
     @Published public private(set) var allItems: [MarketItem] = []
     @Published public private(set) var marketCatalog: [MarketSearchItem] = []
+    /// 顶部状态点使用：当前页面是否处于“实时数据刷新中”。
+    @Published public private(set) var isRealtimeDataActive = false
     /// 自选列表的真实顺序来源。`items` 只是基于它映射出来的展示数组。
     @Published private var watchlistProductIDs: [String] = []
 
@@ -18,6 +20,8 @@ public final class MarketViewModel: ObservableObject {
     private let marketCatalogService = CoinbaseMarketCatalogService()
     private let candlesService = CoinbaseCandlesService()
     private var hourlyTrendByProductID: [String: [Double]] = [:]
+    /// MenuBar 面板可见性。只有面板可见时才开启实时订阅。
+    private var isPanelVisible = false
 
     public init() {
         // 启动时先恢复本地保存的自选顺序，这样 UI 能尽快拿到“上次的自选列表”。
@@ -110,11 +114,18 @@ public final class MarketViewModel: ObservableObject {
         allItems.removeAll()
         hourlyTrendByProductID.removeAll()
         // 自选为空时断开订阅，减少无意义的 websocket 流量。
-        dataStream.disconnect()
+        updateSubscriptions()
     }
 
     public func watchlistItem(for item: MarketSearchItem) -> MarketItem? {
         items.first(where: { $0.productID == item.productID })
+    }
+
+    /// 由外层视图在面板显示/隐藏时调用，控制是否需要实时流。
+    public func setPanelVisible(_ isVisible: Bool) {
+        guard isPanelVisible != isVisible else { return }
+        isPanelVisible = isVisible
+        updateSubscriptions()
     }
 
     private var searchKeyword: String {
@@ -164,11 +175,19 @@ public final class MarketViewModel: ObservableObject {
 
     private func updateSubscriptions() {
         let productIDs = watchlistProductIDs
+        guard isPanelVisible else {
+            dataStream.disconnect()
+            isRealtimeDataActive = false
+            return
+        }
+
         if productIDs.isEmpty {
             dataStream.disconnect()
+            isRealtimeDataActive = false
         } else {
             // websocket 订阅集合始终与当前自选列表保持一致。
             dataStream.connect(productIDs: productIDs)
+            isRealtimeDataActive = true
         }
     }
 

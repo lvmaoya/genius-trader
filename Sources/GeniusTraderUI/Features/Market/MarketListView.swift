@@ -28,6 +28,8 @@ public struct MarketListView: View {
     private let textGreen = Color(red: 0.12, green: 0.62, blue: 0.24)
     private let textRed = Color(red: 0.9, green: 0.18, blue: 0.2)
     private let selectedColor = Color(hex: 0x4690fc)
+    private let realtimeActiveColor = Color(red: 0.12, green: 0.72, blue: 0.31)
+    private let realtimeInactiveColor = Color(hex: 0xB7B7B7)
 
     public init(onQuit: (() -> Void)? = nil) {
         self.onQuit = onQuit
@@ -39,9 +41,17 @@ public struct MarketListView: View {
     public var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Text("Genider")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color(hex: 0x999999))
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(viewModel.isRealtimeDataActive ? realtimeActiveColor : realtimeInactiveColor)
+                        .frame(width: 7, height: 7)
+                        .animation(.easeInOut(duration: 0.2), value: viewModel.isRealtimeDataActive)
+
+                    Text("Genider")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color(hex: 0x999999))
+                }
+                .help(viewModel.isRealtimeDataActive ? "实时数据：开启" : "实时数据：暂停")
 
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass")
@@ -230,6 +240,7 @@ public struct MarketListView: View {
             restorePersistedSelectionIfNeeded()
         }
         .onAppear {
+            viewModel.setPanelVisible(true)
             // 恢复上次点击选中的币种，但只有它仍存在于自选列表时才会真正展示。
             selectedItemID = MarketSelectionStore.loadSelectedItemID()
             selectedMenuItemID = nil
@@ -238,6 +249,7 @@ public struct MarketListView: View {
             updateHoverPreview()
         }
         .onDisappear {
+            viewModel.setPanelVisible(false)
             // 主界面关闭时，主动收起左侧 popover。
             cancelPendingPopoverHide()
             hoverPreviewController.hide()
