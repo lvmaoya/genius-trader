@@ -48,19 +48,17 @@ public struct MarketListView: View {
                         .font(.system(size: 14))
                         .foregroundStyle(Color(hex: 0x999999))
 
-                    ZStack(alignment: .leading) {
-                        if viewModel.searchText.isEmpty {
-                            Text("搜索")
-                                .font(.system(size: 13))
-                                .foregroundStyle(Color(hex: 0x999999))
-                        }
-                        TextField("", text: $viewModel.searchText)
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 14))
-                            .focused($isSearchFieldFocused)
-                            .onSubmit {
-                                isSearchFieldFocused = false
-                            }
+                    TextField(
+                        "",
+                        text: $viewModel.searchText,
+                        prompt: Text("搜索")
+                            .foregroundColor(Color(hex: 0x999999))
+                    )
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 14))
+                    .focused($isSearchFieldFocused)
+                    .onSubmit {
+                        isSearchFieldFocused = false
                     }
                 }
                 .padding(.horizontal, 8)
@@ -79,53 +77,64 @@ public struct MarketListView: View {
                     ScrollView {
                         LazyVStack(spacing: 0) {
                             if viewModel.isSearching {
-                                ForEach(viewModel.searchResults) { item in
-                                    if viewModel.isInWatchlist(item) {
-                                        if let watchlistItem = viewModel.watchlistItem(for: item) {
-                                            MarketRowView(
-                                                item: watchlistItem,
-                                                isSelected: selectedItemID == watchlistItem.id,
-                                                isHovered: hoveredProductID == watchlistItem.productID,
-                                                greenColor: textGreen,
-                                                redColor: textRed,
-                                                selectedColor: selectedColor
-                                            )
-                                            .contentShape(Rectangle())
-                                            .background(rowFrameReader(for: watchlistItem.productID))
-                                            .onTapGesture {
-                                                selectItem(withID: watchlistItem.id)
-                                                selectedMenuItemID = nil
-                                            }
-                                            .contextMenu {
-                                                Button("移除自选", role: .destructive) {
-                                                    removeWatchlistItem(productID: watchlistItem.productID, itemID: watchlistItem.id)
+                                if viewModel.isSearchLoading {
+                                    searchLoadingView
+                                } else if viewModel.searchResults.isEmpty {
+                                    searchEmptyView
+                                } else {
+                                    ForEach(viewModel.searchResults) { item in
+                                        if viewModel.isInWatchlist(item) {
+                                            if let watchlistItem = viewModel.watchlistItem(for: item) {
+                                                MarketRowView(
+                                                    item: watchlistItem,
+                                                    isSelected: selectedItemID == watchlistItem.id,
+                                                    isHovered: hoveredProductID == watchlistItem.productID,
+                                                    greenColor: textGreen,
+                                                    redColor: textRed,
+                                                    selectedColor: selectedColor
+                                                )
+                                                .contentShape(Rectangle())
+                                                .background(rowFrameReader(for: watchlistItem.productID))
+                                                .onTapGesture {
+                                                    selectItem(withID: watchlistItem.id)
+                                                    selectedMenuItemID = nil
+                                                }
+                                                .contextMenu {
+                                                    Button("置顶") {
+                                                        pinWatchlistItemToTop(productID: watchlistItem.productID, itemID: watchlistItem.id)
+                                                    }
+                                                    .disabled(viewModel.isPinnedToTop(productID: watchlistItem.productID))
+
+                                                    Button("移除自选", role: .destructive) {
+                                                        removeWatchlistItem(productID: watchlistItem.productID, itemID: watchlistItem.id)
+                                                    }
+                                                }
+                                                .onHover { isHovered in
+                                                    handleHoverChange(
+                                                        isHovered: isHovered,
+                                                        productID: watchlistItem.productID,
+                                                        selectedID: watchlistItem.id
+                                                    )
                                                 }
                                             }
+                                        } else {
+                                            SearchResultRowView(
+                                                item: item,
+                                                onAdd: {
+                                                    viewModel.addToWatchlist(item)
+                                                },
+                                                selectedColor: selectedColor,
+                                                isHovered: hoveredProductID == item.productID
+                                            )
+                                            .contentShape(Rectangle())
+                                            .background(rowFrameReader(for: item.productID))
                                             .onHover { isHovered in
                                                 handleHoverChange(
                                                     isHovered: isHovered,
-                                                    productID: watchlistItem.productID,
-                                                    selectedID: watchlistItem.id
+                                                    productID: item.productID,
+                                                    selectedID: nil
                                                 )
                                             }
-                                        }
-                                    } else {
-                                        SearchResultRowView(
-                                            item: item,
-                                            onAdd: {
-                                                viewModel.addToWatchlist(item)
-                                            },
-                                            selectedColor: selectedColor,
-                                            isHovered: hoveredProductID == item.productID
-                                        )
-                                        .contentShape(Rectangle())
-                                        .background(rowFrameReader(for: item.productID))
-                                        .onHover { isHovered in
-                                            handleHoverChange(
-                                                isHovered: isHovered,
-                                                productID: item.productID,
-                                                selectedID: nil
-                                            )
                                         }
                                     }
                                 }
@@ -146,6 +155,11 @@ public struct MarketListView: View {
                                         selectedMenuItemID = nil
                                     }
                                     .contextMenu {
+                                        Button("置顶") {
+                                            pinWatchlistItemToTop(productID: item.productID, itemID: item.id)
+                                        }
+                                        .disabled(viewModel.isPinnedToTop(productID: item.productID))
+
                                         Button("移除自选", role: .destructive) {
                                             removeWatchlistItem(productID: item.productID, itemID: item.id)
                                         }
@@ -317,6 +331,12 @@ public struct MarketListView: View {
             isHoveringPopover = false
             hoveredProductID = nil
         }
+    }
+
+    private func pinWatchlistItemToTop(productID: String, itemID: String) {
+        viewModel.pinToTop(productID: productID)
+        selectedItemID = itemID
+        selectedMenuItemID = nil
     }
 
     /// 根据当前 hover 的目标和该行的位置，刷新左侧系统 popover。
@@ -498,6 +518,26 @@ public struct MarketListView: View {
     private func cancelPendingPopoverHide() {
         pendingPopoverHideWorkItem?.cancel()
         pendingPopoverHideWorkItem = nil
+    }
+
+    private var searchLoadingView: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text("搜索中...")
+                .font(.system(size: 13))
+                .foregroundStyle(Color(hex: 0x999999))
+        }
+        .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
+        .padding(.horizontal, 12)
+    }
+
+    private var searchEmptyView: some View {
+        Text("暂无匹配结果")
+            .font(.system(size: 13))
+            .foregroundStyle(Color(hex: 0x999999))
+            .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
+            .padding(.horizontal, 12)
     }
 }
 

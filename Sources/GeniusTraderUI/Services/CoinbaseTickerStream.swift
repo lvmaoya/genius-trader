@@ -21,6 +21,11 @@ final class CoinbaseTickerStream {
     func connect(productIDs: [String]) {
         let normalized = Array(Set(productIDs)).sorted()
         guard !normalized.isEmpty else { return }
+        if normalized == subscribedProductIDs,
+           let currentTask = webSocketTask,
+           currentTask.state == .running {
+            return
+        }
 
         subscribedProductIDs = normalized
         isManualDisconnect = false
